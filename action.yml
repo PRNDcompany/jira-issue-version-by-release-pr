@@ -1,4 +1,4 @@
-name: 'Add version to jira issue by release PR'
+name: 'Jira issue version by release PR'
 description: 'This action extract jira keys from release PR and add version to target jira issue'
 branding:
   icon: "book-open"
