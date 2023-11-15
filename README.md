@@ -16,7 +16,7 @@ This action extract jira keys from release PR and add version to target jira iss
   - default: `true`
 - `skip-child`: Skip child issue
   - Similar `skip-subtask`
-  - If you create Epic issue and add child issue, that issue is not subtask issue. but we don't want to add version to child issue like `sub-task```
+  - If you create Epic issue and add child issue, that issue is not subtask issue. but we don't want to add version to child issue like `sub-task`
   - but if you want to add version to child issue, set `false`
   - default: `true`
 
