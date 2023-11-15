@@ -9,6 +9,7 @@ import {Octokit} from "@octokit/rest";
     const jiraDomain = core.getInput("jira-domain")
     const jiraVersionPrefix = core.getInput("jira-version-prefix")
     const skipSubtask = core.getInput("skip-subtask") == 'true'
+    const skipChild = core.getInput("skip-child") == 'true'
 
     const payload = github.context.payload
     const repository = payload.repository
@@ -38,7 +39,7 @@ import {Octokit} from "@octokit/rest";
         const rawJiraIssueKeys = extractJiraIssueKeys(commitMessages)
         console.log("raw jiraIssueKeys: ", rawJiraIssueKeys)
         const jiraBaseUrl = `https://${jiraDomain}.atlassian.net/rest/api/3`
-        const jiraIssues: Issue[] = await getValidateJiraIssues(jiraToken, jiraBaseUrl, rawJiraIssueKeys, jiraVersionName, skipSubtask)
+        const jiraIssues: Issue[] = await getValidateJiraIssues(jiraToken, jiraBaseUrl, rawJiraIssueKeys, jiraVersionName, skipSubtask, skipChild)
         console.log("jiraIssues: ", jiraIssues)
         for (const issue of jiraIssues) {
             await addJiraIssueVersion(jiraToken, jiraBaseUrl, issue.key, jiraVersionName)
@@ -92,7 +93,7 @@ function extractJiraIssueKeys(commitMessages: string[]): string[] {
     return jiraKeys.sort((first, second) => (first > second ? 1 : -1))
 }
 
-function getJiraVersionName(branchName: string, jiraVersionPrefix: string | null): string | null {
+function getJiraVersionName(branchName: string, jiraVersionPrefix?: string): string | null {
     const regex = new RegExp(`release/(\\d+\\.\\d+\\.\\d+)`, "g")
     const matches: string[] | null = regex.exec(branchName)
     if (matches == null) {
@@ -106,7 +107,7 @@ function getJiraVersionName(branchName: string, jiraVersionPrefix: string | null
     }
 }
 
-async function getValidateJiraIssues(jiraToken: string, baseUrl: string, jiraIssueKeys: string[], jiraVersionName: string, skipSubtask: boolean,) {
+async function getValidateJiraIssues(jiraToken: string, baseUrl: string, jiraIssueKeys: string[], jiraVersionName: string, skipSubtask: boolean, skipChild: boolean) {
     // Get jira issue from jiraIssueKey
     const jiraIssues: Issue[] = await Promise.all(
         jiraIssueKeys.map((jiraIssueKey: string) => {
@@ -116,8 +117,12 @@ async function getValidateJiraIssues(jiraToken: string, baseUrl: string, jiraIss
 
     // Filter subtask and already fixed version
     return jiraIssues.filter((issue: Issue) => {
+
         if (skipSubtask && issue.isSubtask) {
             return false
+        } else if (skipChild) {
+            const isChildTask = issue.parentKey != null || issue.project == issue.parentProject
+            return !isChildTask
         } else if (issue.fixVersions.includes(jiraVersionName)) {
             return false
         }
@@ -137,7 +142,9 @@ async function getJiraIssue(jiraToken: string, baseUrl: string, jiraIssueKey: st
     });
 
     const fields = response.fields
-    return new Issue(jiraIssueKey, fields.issuetype.subtask, fields.fixVersions.map((fixVersion: any) => fixVersion.name))
+    const fixVersions = fields.fixVersions.map((fixVersion: any) => fixVersion.name)
+    const parentKey = fields.parent?.key
+    return new Issue(jiraIssueKey, fields.issuetype.subtask, fixVersions, parentKey)
 }
 
 
@@ -162,12 +169,18 @@ async function addJiraIssueVersion(jiraToken: string, baseUrl: string, jiraIssue
 class Issue {
 
     key: string
+    project: string
     isSubtask: boolean
     fixVersions: string[]
+    parentKey?: string
+    parentProject?: string
 
-    constructor(key: string, isSubtask: boolean, fixVersions: string[]) {
+    constructor(key: string, isSubtask: boolean, fixVersions: string[], parentKey?: string) {
         this.key = key;
+        this.project = key.split("-")[0];
         this.isSubtask = isSubtask;
         this.fixVersions = fixVersions;
+        this.parentKey = parentKey;
+        this.parentProject = parentKey?.split("-")[0];
     }
 }

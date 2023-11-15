@@ -14,6 +14,11 @@ This action extract jira keys from release PR and add version to target jira iss
   - we only think about parent issue's version
   - but if you want to add version to subtask issue, set `false` 
   - default: `true`
+- `skip-child`: Skip child issue
+  - Similar `skip-subtask`
+  - If you create Epic issue and add child issue, that issue is not subtask issue. but we don't want to add version to child issue like `sub-task```
+  - but if you want to add version to child issue, set `false`
+  - default: `true`
 
 ### Jira Token
 https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/

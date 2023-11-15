@@ -21,6 +21,10 @@ inputs:
     description: 'Skip subtask jira issue'
     required: false
     default: "true"
+  skip-child:
+    description: 'Skip child jira issue'
+    required: false
+    default: "true"
 
 outputs:
   jira_issue_keys:
