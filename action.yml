@@ -1,0 +1,30 @@
+name: 'Add version to jira issue by release PR'
+description: 'This action extract jira keys from release PR and add version to target jira issue'
+branding:
+  icon: "book-open"
+  color: "blue"
+
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  jira-token:
+    description: 'Jira API token key'
+    required: true
+  jira-domain:
+    description: 'Domain name(https://your-domain.atlassian.net)'
+    required: true
+  jira-version-prefix:
+    description: 'Customer'
+    required: false
+  skip-subtask:
+    description: 'Skip subtask jira issue'
+    required: false
+    default: "true"
+
+outputs:
+  jira_issue_keys:
+    description: 'Jira issue key list'
+runs:
+  using: 'node16'
+  main: 'dist/index.js'
