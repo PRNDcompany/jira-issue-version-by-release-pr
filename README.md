@@ -40,7 +40,7 @@ $EncodedText
 
 ## Example usage
 ```yaml
-name: Add version to jira issue by release PR
+name: Jira issue version by release PR
 on:
   pull_request:
     types: [ opened, synchronize, ready_for_review ]
