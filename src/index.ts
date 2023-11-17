@@ -73,7 +73,7 @@ async function getGitHubCommitMessages(githubToken: string, owner: string, repo:
 }
 
 function extractJiraIssueKeys(commitMessages: string[]): string[] {
-    const regex = new RegExp(`[A-Z]+-\\d+`, "g")
+    const regex = new RegExp(`^[A-Z]+-\\d+`, "g")
     const jiraKeys: string[] = []
     for (const commitMessage of commitMessages) {
         // Find jira id per commitMessage
