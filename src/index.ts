@@ -3,6 +3,8 @@ import * as github from "@actions/github";
 import * as request from "request-promise";
 import {Octokit} from "@octokit/rest";
 
+let failJiraIssueKeys: string[] = [];
+
 (async () => {
     const githubToken = core.getInput("github-token")
     const jiraToken = core.getInput("jira-token")
@@ -43,10 +45,15 @@ import {Octokit} from "@octokit/rest";
         console.log("jiraIssues: ", jiraIssues)
         for (const issue of jiraIssues) {
             await addJiraIssueVersion(jiraToken, jiraBaseUrl, issue.key, jiraVersionName)
+                .catch((e: any) => {
+                    console.log(`[addJiraIssueVersion][${issue.key}]: ${e.message}}`)
+                    failJiraIssueKeys.push(issue.key)
+                })
         }
 
         const outputJiraIssueKeys = jiraIssues.map((issue: Issue) => issue.key)
         core.setOutput("jira_issue_keys", outputJiraIssueKeys)
+        core.setOutput("fail_jira_issue_keys", failJiraIssueKeys)
     } catch (error: any) {
         core.setFailed(error.message);
     }
@@ -73,7 +80,7 @@ async function getGitHubCommitMessages(githubToken: string, owner: string, repo:
 }
 
 function extractJiraIssueKeys(commitMessages: string[]): string[] {
-    const regex = new RegExp(`[A-Z]+-\\d+`, "g")
+    const regex = new RegExp(`^[A-Z]+-\\d+`, "g")
     const jiraKeys: string[] = []
     for (const commitMessage of commitMessages) {
         // Find jira id per commitMessage
@@ -112,13 +119,19 @@ async function getValidateJiraIssues(jiraToken: string, baseUrl: string, jiraIss
     const jiraIssues: Issue[] = await Promise.all(
         jiraIssueKeys.map((jiraIssueKey: string) => {
             return getJiraIssue(jiraToken, baseUrl, jiraIssueKey)
+                .catch((e: any) => {
+                    console.log(`[getJiraIssue][${jiraIssueKey}]: ${e.message}}`)
+                    failJiraIssueKeys.push(jiraIssueKey)
+                    return new Issue("", true, [])
+                })
         })
     );
 
     // Filter subtask and already fixed version
     return jiraIssues.filter((issue: Issue) => {
-
-        if (skipSubtask && issue.isSubtask) {
+        if (issue.key == "") {
+            return false
+        } else if (skipSubtask && issue.isSubtask) {
             return false
         } else if (skipChild) {
             const isChildTask = issue.parentKey != null || issue.project == issue.parentProject
