@@ -27,12 +27,14 @@ const core = __importStar(require("@actions/core"));
 const github = __importStar(require("@actions/github"));
 const request = __importStar(require("request-promise"));
 const rest_1 = require("@octokit/rest");
+let failJiraIssueKeys = [];
 (async () => {
     const githubToken = core.getInput("github-token");
     const jiraToken = core.getInput("jira-token");
     const jiraDomain = core.getInput("jira-domain");
     const jiraVersionPrefix = core.getInput("jira-version-prefix");
     const skipSubtask = core.getInput("skip-subtask") == 'true';
+    const skipChild = core.getInput("skip-child") == 'true';
     const payload = github.context.payload;
     const repository = payload.repository;
     if (repository == null) {
@@ -59,13 +61,18 @@ const rest_1 = require("@octokit/rest");
         const rawJiraIssueKeys = extractJiraIssueKeys(commitMessages);
         console.log("raw jiraIssueKeys: ", rawJiraIssueKeys);
         const jiraBaseUrl = `https://${jiraDomain}.atlassian.net/rest/api/3`;
-        const jiraIssues = await getValidateJiraIssues(jiraToken, jiraBaseUrl, rawJiraIssueKeys, jiraVersionName, skipSubtask);
+        const jiraIssues = await getValidateJiraIssues(jiraToken, jiraBaseUrl, rawJiraIssueKeys, jiraVersionName, skipSubtask, skipChild);
         console.log("jiraIssues: ", jiraIssues);
         for (const issue of jiraIssues) {
-            await addJiraIssueVersion(jiraToken, jiraBaseUrl, issue.key, jiraVersionName);
+            await addJiraIssueVersion(jiraToken, jiraBaseUrl, issue.key, jiraVersionName)
+                .catch((e) => {
+                console.log(`[addJiraIssueVersion][${issue.key}]: ${e.message}}`);
+                failJiraIssueKeys.push(issue.key);
+            });
         }
         const outputJiraIssueKeys = jiraIssues.map((issue) => issue.key);
         core.setOutput("jira_issue_keys", outputJiraIssueKeys);
+        core.setOutput("fail_jira_issue_keys", failJiraIssueKeys);
     }
     catch (error) {
         core.setFailed(error.message);
@@ -87,7 +94,7 @@ async function getGitHubCommitMessages(githubToken, owner, repo, prNumber) {
     });
 }
 function extractJiraIssueKeys(commitMessages) {
-    const regex = new RegExp(`[A-Z]+-\\d+`, "g");
+    const regex = new RegExp(`^[A-Z]+-\\d+`, "g");
     const jiraKeys = [];
     for (const commitMessage of commitMessages) {
         // Find jira id per commitMessage
@@ -121,15 +128,27 @@ function getJiraVersionName(branchName, jiraVersionPrefix) {
         return versionName;
     }
 }
-async function getValidateJiraIssues(jiraToken, baseUrl, jiraIssueKeys, jiraVersionName, skipSubtask) {
+async function getValidateJiraIssues(jiraToken, baseUrl, jiraIssueKeys, jiraVersionName, skipSubtask, skipChild) {
     // Get jira issue from jiraIssueKey
     const jiraIssues = await Promise.all(jiraIssueKeys.map((jiraIssueKey) => {
-        return getJiraIssue(jiraToken, baseUrl, jiraIssueKey);
+        return getJiraIssue(jiraToken, baseUrl, jiraIssueKey)
+            .catch((e) => {
+            console.log(`[getJiraIssue][${jiraIssueKey}]: ${e.message}}`);
+            failJiraIssueKeys.push(jiraIssueKey);
+            return new Issue("", true, []);
+        });
     }));
     // Filter subtask and already fixed version
     return jiraIssues.filter((issue) => {
-        if (skipSubtask && issue.isSubtask) {
+        if (issue.key == "") {
             return false;
+        }
+        else if (skipSubtask && issue.isSubtask) {
+            return false;
+        }
+        else if (skipChild) {
+            const isChildTask = issue.parentKey != null || issue.project == issue.parentProject;
+            return !isChildTask;
         }
         else if (issue.fixVersions.includes(jiraVersionName)) {
             return false;
@@ -138,6 +157,7 @@ async function getValidateJiraIssues(jiraToken, baseUrl, jiraIssueKeys, jiraVers
     });
 }
 async function getJiraIssue(jiraToken, baseUrl, jiraIssueKey) {
+    var _a;
     //https://yourdomain.atlassian.net/rest/api/3/issue/ABC-10829
     const url = `${baseUrl}/issue/${jiraIssueKey}`;
     const response = await request.get(url, {
@@ -147,7 +167,9 @@ async function getJiraIssue(jiraToken, baseUrl, jiraIssueKey) {
         json: true,
     });
     const fields = response.fields;
-    return new Issue(jiraIssueKey, fields.issuetype.subtask, fields.fixVersions.map((fixVersion) => fixVersion.name));
+    const fixVersions = fields.fixVersions.map((fixVersion) => fixVersion.name);
+    const parentKey = (_a = fields.parent) === null || _a === void 0 ? void 0 : _a.key;
+    return new Issue(jiraIssueKey, fields.issuetype.subtask, fixVersions, parentKey);
 }
 async function addJiraIssueVersion(jiraToken, baseUrl, jiraIssueKey, jiraVersionName) {
     //https://yourdomain.atlassian.net/rest/api/3/issue/ABC-10829
@@ -167,9 +189,12 @@ async function addJiraIssueVersion(jiraToken, baseUrl, jiraIssueKey, jiraVersion
     });
 }
 class Issue {
-    constructor(key, isSubtask, fixVersions) {
+    constructor(key, isSubtask, fixVersions, parentKey) {
         this.key = key;
+        this.project = key.split("-")[0];
         this.isSubtask = isSubtask;
         this.fixVersions = fixVersions;
+        this.parentKey = parentKey;
+        this.parentProject = parentKey === null || parentKey === void 0 ? void 0 : parentKey.split("-")[0];
     }
 }
