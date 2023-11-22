@@ -101,7 +101,7 @@ function extractJiraIssueKeys(commitMessages: string[]): string[] {
 }
 
 function getJiraVersionName(branchName: string, jiraVersionPrefix?: string): string | null {
-    const regex = new RegExp(`release/(\\d+\\.\\d+\\.\\d+)`, "g")
+    const regex = new RegExp(`/(\\d+\\.\\d+\\.\\d+)`, "g")
     const matches: string[] | null = regex.exec(branchName)
     if (matches == null) {
         return null
