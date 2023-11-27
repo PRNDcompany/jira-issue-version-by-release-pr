@@ -40,8 +40,8 @@ $EncodedText
 
 
 ## Outputs
-- `jira_issue_keys`: Jira issue key list 
-
+- `jira_issue_keys`: Jira issue key list
+- `fail_jira_issue_keys`: Fail Jira issue key list 
 
 ## Example usage
 ```yaml
