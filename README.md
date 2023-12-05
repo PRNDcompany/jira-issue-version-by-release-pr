@@ -57,7 +57,7 @@ jobs:
     steps:
     - name: Jira issue version by release PR
       id: add_jira_issue_version
-      uses: PRNDcompany/jira-issue-version-by-release-pr@0.1
+      uses: PRNDcompany/jira-issue-version-by-release-pr@0.6
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         jira-token: ${{ secrets.JIRA_TOKEN }}
