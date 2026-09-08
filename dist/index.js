@@ -115,7 +115,7 @@ function extractJiraIssueKeys(commitMessages) {
     return jiraKeys.sort((first, second) => (first > second ? 1 : -1));
 }
 function getJiraVersionName(branchName, jiraVersionPrefix) {
-    const regex = new RegExp(`release/(\\d+\\.\\d+\\.\\d+)`, "g");
+    const regex = new RegExp(`/(\\d+\\.\\d+\\.\\d+)`, "g");
     const matches = regex.exec(branchName);
     if (matches == null) {
         return null;
